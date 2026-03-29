@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNO AI – Adversarial Search</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+:root{--red:#e63946;--blue:#457b9d;--green:#2a9d8f;--yellow:#e9c46a;--dark:#0d0d0d;--mid:#1a1a2e;--panel:#16213e;--light:#e8e8e8;--accent:#f4a261;--skip-color:#9b5de5;--border:rgba(255,255,255,0.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--dark);color:var(--light);font-family:'Space Mono',monospace;min-height:100vh;overflow-x:hidden}
+header{background:linear-gradient(135deg,#0d0d0d 0%,#1a0533 100%);border-bottom:2px solid var(--accent);padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-family:'Archivo Black',sans-serif;font-size:1.8rem;letter-spacing:.05em;background:linear-gradient(90deg,var(--accent),#e63946);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:.6rem;color:#777;letter-spacing:.15em;text-transform:uppercase}
+.container{display:grid;grid-template-columns:260px 1fr 290px;height:calc(100vh - 62px);position:relative}
+.left-panel{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.panel-title{font-family:'Archivo Black',sans-serif;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);padding:12px 14px 8px;border-bottom:1px solid var(--border)}
+.player-info{padding:10px 14px;border-bottom:1px solid var(--border);position:relative}
+.player-info.active{background:rgba(244,162,97,.08)}
+.player-info.active::before{content:'▶';position:absolute;left:3px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:.55rem}
+.player-row{display:flex;align-items:center;gap:8px}
+.player-name{font-family:'Archivo Black',sans-serif;font-size:.75rem;display:flex;align-items:center;gap:6px}
+.player-strategy{font-size:.55rem;color:#777;margin-top:2px}
+.card-count{display:inline-block;background:var(--accent);color:var(--dark);font-family:'Archivo Black',sans-serif;font-size:.7rem;padding:2px 7px;border-radius:10px;margin-left:auto}
+.algo-badge{font-size:.5rem;padding:1px 5px;border-radius:3px;letter-spacing:.1em;text-transform:uppercase}
+.badge-mm{background:rgba(69,123,157,.3);color:#7ec8e3;border:1px solid #457b9d}
+.badge-ex{background:rgba(230,57,70,.3);color:#ff8fa3;border:1px solid #e63946}
+.badge-user{background:rgba(42,157,143,.3);color:#7decd4;border:1px solid #2a9d8f}
+.score-row{display:flex;justify-content:space-between;padding:4px 0;font-size:.58rem;color:#666}
+.score-val{color:var(--light)}
+#setup-overlay{position:absolute;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)}
+.setup-box{background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:36px;max-width:440px;width:90%;text-align:center}
+.setup-box h2{font-family:'Archivo Black',sans-serif;font-size:1.5rem;color:var(--accent);margin-bottom:8px}
+.setup-box p{font-size:.65rem;color:#888;margin-bottom:24px;line-height:1.8}
+.mode-buttons{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.mode-btn{padding:12px 24px;border:2px solid;border-radius:8px;font-family:'Archivo Black',sans-serif;font-size:.8rem;cursor:pointer;transition:all .2s;letter-spacing:.05em;background:transparent}
+.mode-btn.sim{border-color:var(--accent);color:var(--accent)}.mode-btn.sim:hover{background:var(--accent);color:var(--dark)}
+.mode-btn.manual{border-color:var(--green);color:var(--green)}.mode-btn.manual:hover{background:var(--green);color:var(--dark)}
+.main-area{display:flex;flex-direction:column;overflow:hidden}
+.game-board{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;position:relative;background:radial-gradient(ellipse at center,#1a1a2e 0%,#0d0d0d 70%);overflow:hidden;min-height:0}
+.game-board::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(244,162,97,.04) 0%,transparent 70%);pointer-events:none}
+.turn-indicator{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);border:1px solid var(--accent);border-radius:20px;padding:5px 18px;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}
+.uno-card{width:68px;height:102px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Archivo Black',sans-serif;font-size:1.4rem;position:relative;box-shadow:0 6px 20px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.15);cursor:default;transition:transform .15s,box-shadow .15s;user-select:none;flex-shrink:0}
+.uno-card.small{width:44px;height:66px;font-size:.85rem;border-radius:6px}
+.uno-card.tiny{width:30px;height:45px;font-size:.6rem;border-radius:4px}
+.uno-card.playable{cursor:pointer;border-color:rgba(255,255,255,.5);animation:glow-pulse 1.5s ease-in-out infinite}
+.uno-card.playable:hover{transform:translateY(-8px) scale(1.06);box-shadow:0 16px 32px rgba(0,0,0,.7),0 0 20px rgba(255,255,255,.25)}
+@keyframes glow-pulse{0%,100%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 8px rgba(255,255,255,.1)}50%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 18px rgba(255,255,255,.3)}}
+.card-color-red{background:linear-gradient(135deg,#e63946,#c1121f);color:#fff}
+.card-color-blue{background:linear-gradient(135deg,#457b9d,#1d3557);color:#fff}
+.card-color-green{background:linear-gradient(135deg,#2a9d8f,#145a52);color:#fff}
+.card-color-yellow{background:linear-gradient(135deg,#e9c46a,#c88b10);color:#1a1a1a}
+.card-color-skip{background:linear-gradient(135deg,#9b5de5,#5a0fa0);color:#fff}
+.card-color-back{background:linear-gradient(135deg,#1a1a2e,#0d0d0d);color:var(--accent);font-size:.5rem;letter-spacing:.05em}
+.card-number{line-height:1}
+.card-corner{position:absolute;font-size:.45rem;line-height:1;opacity:.7}
+.card-corner.tl{top:4px;left:5px}.card-corner.br{bottom:4px;right:5px;transform:rotate(180deg)}
+.play-area{display:flex;gap:28px;align-items:center}
+.deck-btn{width:68px;height:102px;border-radius:10px;background:linear-gradient(135deg,#1a1a2e,#0d0d0d);border:2px solid var(--accent);color:var(--accent);font-family:'Archivo Black',sans-serif;font-size:.65rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:all .2s;letter-spacing:.1em}
+.deck-btn:hover:not(:disabled){background:rgba(244,162,97,.1);transform:scale(1.04)}.deck-btn:disabled{opacity:.3;cursor:not-allowed}
+.deck-count{font-size:1.1rem}
+.p3-hand-area{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 16px;background:rgba(42,157,143,.05);border-top:1px solid rgba(42,157,143,.2)}
+.p3-hand-label{font-size:.58rem;letter-spacing:.2em;color:#2a9d8f;text-transform:uppercase}
+.p3-hand{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:620px}
+.action-msg{font-size:.68rem;color:var(--accent);text-align:center;padding:5px;min-height:22px}
+.right-panel{background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.log-container{flex:1;overflow-y:auto;padding:6px 10px;scroll-behavior:smooth}
+.log-container::-webkit-scrollbar{width:3px}.log-container::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.log-entry{font-size:.6rem;line-height:1.6;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.log-entry .turn-num{color:#444;margin-right:5px}
+.log-entry.p1 .actor{color:#7ec8e3}.log-entry.p2 .actor{color:#ff8fa3}.log-entry.p3 .actor{color:#7decd4}
+.log-entry.sys{color:#555;font-style:italic}.log-entry.win{color:var(--accent);font-family:'Archivo Black',sans-serif}
+.tree-panel{border-top:1px solid var(--border);max-height:190px;overflow-y:auto}
+.tree-panel::-webkit-scrollbar{width:3px}.tree-panel::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.tree-entry{font-size:.57rem;padding:2px 10px;color:#555;border-left:2px solid transparent;white-space:pre;line-height:1.5}
+.tree-entry.best{color:var(--accent);border-left-color:var(--accent)}.tree-entry.node-max{color:#7ec8e3}.tree-entry.node-min{color:#ff8fa3}.tree-entry.node-chance{color:#e9c46a}.tree-entry.header{color:#777;font-style:italic;border-bottom:1px solid var(--border);margin-bottom:2px;padding-bottom:3px}
+.controls{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap}
+.ctrl-btn{flex:1;min-width:70px;padding:7px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--light);font-family:'Space Mono',monospace;font-size:.6rem;cursor:pointer;transition:all .15s;letter-spacing:.05em}
+.ctrl-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}.ctrl-btn:disabled{opacity:.3;cursor:not-allowed}.ctrl-btn.primary{border-color:var(--accent);color:var(--accent)}
+.speed-row{display:flex;align-items:center;gap:7px;padding:7px 14px;border-top:1px solid var(--border);font-size:.58rem;color:#666}
+.speed-row input[type=range]{flex:1;accent-color:var(--accent)}
+#win-overlay{position:absolute;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(6px)}
+#win-overlay.show{display:flex}
+.win-box{text-align:center;animation:pop-in .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop-in{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+.win-title{font-family:'Archivo Black',sans-serif;font-size:2.8rem;color:var(--accent);line-height:1;margin-bottom:8px}
+.win-subtitle{font-size:.75rem;color:#888;margin-bottom:22px}
+.win-btn{padding:11px 28px;border:2px solid var(--accent);background:transparent;color:var(--accent);font-family:'Archivo Black',sans-serif;font-size:.85rem;border-radius:8px;cursor:pointer;letter-spacing:.1em;transition:all .2s}
+.win-btn:hover{background:var(--accent);color:var(--dark)}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>UNO · AI</h1><div class="subtitle">Adversarial Search · Minimax + Expectimax</div></div>
+  <div style="font-size:.58rem;color:#444;text-align:right;line-height:1.8">P1 → Minimax (Defensive)<br>P2 → Expectimax (Offensive)<br>P3 → User / Simulation</div>
+</header>
+
+<div class="container">
+  <div class="left-panel">
+    <div class="panel-title">Players</div>
+    <div class="player-info" id="p1-info">
+      <div class="player-row">
+        <div><div class="player-name"><span class="algo-badge badge-mm">MM</span> Player 1</div><div class="player-strategy">Minimax · Defensive</div></div>
+        <div class="card-count" id="p1-count">5</div>
+      </div>
+      <div class="score-row"><span>Eval Score</span><span class="score-val" id="p1-score">—</span></div>
+    </div>
+    <div class="player-info" id="p2-info">
+      <div class="player-row">
+        <div><div class="player-name"><span class="algo-badge badge-ex">EX</span> Player 2</div><div class="player-strategy">Expectimax · Offensive</div></div>
+        <div class="card-count" id="p2-count">5</div>
+      </div>
+      <div class="score-row"><span>Eval Score</span><span class="score-val" id="p2-score">—</span></div>
+    </div>
+    <div class="player-info" id="p3-info">
+      <div class="player-row">
+        <div><div class="player-name"><span class="algo-badge badge-user" id="p3-badge">USR</span> Player 3</div><div class="player-strategy" id="p3-strategy">Manual / Simulation</div></div>
+        <div class="card-count" id="p3-count">5</div>
+      </div>
+      <div class="score-row"><span>Eval Score</span><span class="score-val" id="p3-score">—</span></div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="speed-row" id="speed-row" style="display:none">
+      <span>Speed</span>
+      <input type="range" id="speed-slider" min="200" max="2500" value="900" step="100">
+      <span id="speed-label">0.9s</span>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="game-board" id="game-board">
+      <div class="turn-indicator" id="turn-indicator">Waiting…</div>
+      <div style="display:flex;gap:20px;align-items:flex-start">
+        <div style="text-align:center"><div style="font-size:.5rem;color:#444;letter-spacing:.15em;margin-bottom:3px">P1 HAND</div><div id="p1-hand-top" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;max-width:180px"></div></div>
+        <div style="text-align:center"><div style="font-size:.5rem;color:#444;letter-spacing:.15em;margin-bottom:3px">P2 HAND</div><div id="p2-hand-top" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;max-width:180px"></div></div>
+      </div>
+      <div class="play-area">
+        <div style="text-align:center">
+          <button class="deck-btn" id="deck-btn" disabled><span class="deck-count" id="deck-count">—</span><span>DRAW</span></button>
+          <div style="font-size:.5rem;color:#444;margin-top:4px">Deck</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:.55rem;color:#555;letter-spacing:.15em;margin-bottom:6px">TOP CARD</div>
+          <div class="uno-card" id="top-card" style="width:80px;height:120px;font-size:1.8rem">—</div>
+        </div>
+      </div>
+      <div class="action-msg" id="action-msg">Choose a mode to begin.</div>
+    </div>
+    <div class="p3-hand-area">
+      <div class="p3-hand-label" id="p3-hand-label">Player 3 · Hand</div>
+      <div class="p3-hand" id="p3-hand"></div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="panel-title">Game Log</div>
+    <div class="log-container" id="log"></div>
+    <div class="panel-title" style="border-top:1px solid var(--border)">Search Tree (Last Move)</div>
+    <div class="tree-panel" id="tree-panel"></div>
+    <div class="controls">
+      <button class="ctrl-btn primary" id="next-btn" disabled>Next Turn</button>
+      <button class="ctrl-btn" id="restart-btn">Restart</button>
+    </div>
+    <div class="speed-row" id="auto-row" style="display:none">
+      <span style="white-space:nowrap">Auto Play</span>
+      <button class="ctrl-btn" id="auto-btn" style="flex:0;padding:6px 10px;min-width:unset">▶ Run</button>
+    </div>
+  </div>
+
+  <div id="setup-overlay">
+    <div class="setup-box">
+      <h2>UNO · AI</h2>
+      <p>Minimax (Defensive) vs Expectimax (Offensive)<br>Select Player 3 mode to begin:</p>
+      <div class="mode-buttons">
+        <button class="mode-btn sim" onclick="startGame('sim')">Simulation Mode<br><span style="font-size:.6rem;font-weight:normal;font-family:'Space Mono',monospace">Watch 3 AIs play</span></button>
+        <button class="mode-btn manual" onclick="startGame('manual')">Manual Mode<br><span style="font-size:.6rem;font-weight:normal;font-family:'Space Mono',monospace">You play as P3</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="win-overlay">
+    <div class="win-box">
+      <div class="win-title" id="win-title">UNO!</div>
+      <div class="win-subtitle" id="win-sub"></div>
+      <button class="win-btn" onclick="resetGame()">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// CARD & DECK
+// ══════════════════════════════════════════════
+const COLORS=['Red','Blue','Green','Yellow'];
+class Card{
+  constructor(c,n){this.color=c;this.number=n}
+  get isSkip(){return this.number==='Skip'}
+  toString(){return`${this.color} ${this.number}`}
+  clone(){return new Card(this.color,this.number)}
+}
+function buildDeck(){
+  const d=[];
+  for(const c of COLORS){
+    for(let n=0;n<=9;n++)d.push(new Card(c,n));
+    d.push(new Card(c,'Skip'));d.push(new Card(c,'Skip'));
+  }
+  return shuffle(d);
+}
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]]}
+  return a;
+}
+function getValidMoves(hand,top){
+  return hand.filter(c=>c.color===top.color||(c.number!=='Skip'&&c.number===top.number)||(c.isSkip&&top.isSkip));
+}
+
+// ══════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════
+let G=null,gameMode=null,autoRunning=false,autoInterval=null,turnNum=0,treeLog=[];
+
+function initState(){
+  const deck=buildDeck();
+  const hands=[[],[],[]];
+  for(let i=0;i<5;i++)for(let p=0;p<3;p++)hands[p].push(deck.pop());
+  let top;do{top=deck.pop()}while(top.isSkip);
+  return{hands,topCard:top,deck,currentPlayer:0,skipNext:false,gameOver:false,winner:null};
+}
+function cloneState(s){
+  return{hands:s.hands.map(h=>h.map(c=>c.clone())),topCard:s.topCard.clone(),deck:s.deck.map(c=>c.clone()),currentPlayer:s.currentPlayer,skipNext:s.skipNext,gameOver:s.gameOver,winner:s.winner};
+}
+function applyMove(state,pi,move){
+  const s=cloneState(state);
+  if(move===null){
+    if(s.deck.length===0)s.deck.push(...shuffle(buildDeck()));
+    if(s.deck.length>0)s.hands[pi].push(s.deck.pop());
+  }else{
+    const n=move.number,c=move.color;
+    const idx=s.hands[pi].findIndex(x=>x.color===c&&x.number===n);
+    if(idx>=0)s.hands[pi].splice(idx,1);
+    s.topCard=move.clone();
+    if(move.isSkip)s.skipNext=true;
+    if(s.hands[pi].length===0){s.gameOver=true;s.winner=pi}
+  }
+  const didSkip=move&&move.isSkip&&s.skipNext;
+  s.currentPlayer=((s.currentPlayer+1+(didSkip?1:0))%3);
+  if(didSkip)s.skipNext=false;
+  return s;
+}
+
+// ══════════════════════════════════════════════
+// EVALUATION
+// ══════════════════════════════════════════════
+// Score = base - w1*CAI + w2*Copp + w3*S
+function evaluate(s,pi,offensive){
+  const cai=s.hands[pi].length;
+  const others=[0,1,2].filter(i=>i!==pi);
+  const copp=(s.hands[others[0]].length+s.hands[others[1]].length)/2;
+  const sk=s.hands[pi].filter(c=>c.isSkip).length;
+  if(offensive)return 50-7*cai+3*copp+2*sk;
+  return 50-5*cai+2*copp+4*sk;
+}
+
+// ══════════════════════════════════════════════
+// MINIMAX (Defensive – P1 & P3-sim)
+// ══════════════════════════════════════════════
+function minimax(s,depth,pi,isMax,a,b,log,ind){
+  if(s.gameOver||depth===0){
+    const v=evaluate(s,pi,false);
+    if(log&&treeLog.length<50)treeLog.push({ind,t:'leaf',txt:`eval=${v.toFixed(1)}`});
+    return v;
+  }
+  const cur=s.currentPlayer;
+  const moves=[...getValidMoves(s.hands[cur],s.topCard),null].slice(0,4);
+  if(isMax){
+    let best=-Infinity;
+    for(const m of moves){
+      if(log&&treeLog.length<50)treeLog.push({ind,t:'max',txt:`MAX P${cur+1}: ${m?m.toString():'Draw'}`});
+      const v=minimax(applyMove(s,cur,m),depth-1,pi,false,a,b,log,ind+1);
+      if(v>best)best=v;
+      a=Math.max(a,v);if(b<=a)break;
+    }
+    return best;
+  }else{
+    let worst=Infinity;
+    for(const m of moves.slice(0,3)){
+      if(log&&treeLog.length<50)treeLog.push({ind,t:'min',txt:`MIN P${cur+1}: ${m?m.toString():'Draw'}`});
+      const ns=applyMove(s,cur,m);
+      const v=minimax(ns,depth-1,pi,ns.currentPlayer===pi,a,b,log,ind+1);
+      if(v<worst)worst=v;
+      b=Math.min(b,v);if(b<=a)break;
+    }
+    return worst;
+  }
+}
+function minimaxBestMove(s,pi){
+  const hand=s.hands[pi];
+  const moves=[...getValidMoves(hand,s.topCard),null];
+  treeLog=[];
+  treeLog.push({ind:0,t:'header',txt:`P${pi+1} Minimax (Defensive) Depth=3`});
+  let best=null,bestV=-Infinity;
+  const scores=[];
+  for(const m of moves){
+    treeLog.push({ind:0,t:'max',txt:`Root candidate: ${m?m.toString():'Draw'}`});
+    const ns=applyMove(s,pi,m);
+    const v=minimax(ns,2,pi,ns.currentPlayer===pi,-Infinity,Infinity,true,1);
+    scores.push({move:m,score:v});
+    if(v>bestV){bestV=v;best=m}
+  }
+  treeLog.push({ind:0,t:'best',txt:`BEST → ${best?best.toString():'Draw'} (score: ${bestV.toFixed(1)})`});
+  return{move:best,score:bestV,allScores:scores};
+}
+
+// ══════════════════════════════════════════════
+// EXPECTIMAX (Offensive – P2)
+// ══════════════════════════════════════════════
+function expectimax(s,depth,pi,log,ind){
+  if(s.gameOver||depth===0){
+    const v=evaluate(s,pi,true);
+    if(log&&treeLog.length<50)treeLog.push({ind,t:'leaf',txt:`eval=${v.toFixed(1)}`});
+    return v;
+  }
+  const cur=s.currentPlayer;
+  const moves=getValidMoves(s.hands[cur],s.topCard);
+  if(cur===pi){
+    const all=[...moves,null];
+    let best=-Infinity;
+    for(const m of all){
+      if(log&&treeLog.length<50)treeLog.push({ind,t:'max',txt:`MAX P${cur+1}: ${m?m.toString():'→CHANCE(Draw)'}`});
+      const v=m===null?chanceNode(s,pi,depth-1,log,ind+1):expectimax(applyMove(s,cur,m),depth-1,pi,log,ind+1);
+      if(v>best)best=v;
+    }
+    return best;
+  }else{
+    const all=[...moves,null].slice(0,3);
+    if(all.length===0)return evaluate(s,pi,true);
+    const m=all[0|Math.random()*all.length];
+    if(log&&treeLog.length<50)treeLog.push({ind,t:'opp',txt:`OPP P${cur+1}: ${m?m.toString():'Draw'}`});
+    return expectimax(applyMove(s,cur,m),depth-1,pi,log,ind+1);
+  }
+}
+function chanceNode(s,pi,depth,log,ind){
+  if(s.deck.length===0)return evaluate(s,pi,true);
+  const sample=s.deck.slice(-Math.min(s.deck.length,6));
+  const p=1/sample.length;
+  let ev=0;
+  for(const drawnCard of sample){
+    const ns=cloneState(s);
+    ns.hands[pi].push(drawnCard.clone());
+    ns.currentPlayer=(s.currentPlayer+1)%3;
+    if(log&&treeLog.length<50)treeLog.push({ind,t:'chance',txt:`CHANCE p=${p.toFixed(2)}: draw ${drawnCard.toString()}`});
+    ev+=p*expectimax(ns,depth-1,pi,log,ind+1);
+  }
+  return ev;
+}
+function expectimaxBestMove(s,pi){
+  const hand=s.hands[pi];
+  const moves=[...getValidMoves(hand,s.topCard),null];
+  treeLog=[];
+  treeLog.push({ind:0,t:'header',txt:`P${pi+1} Expectimax (Offensive) Depth=3`});
+  let best=null,bestV=-Infinity;
+  const scores=[];
+  for(const m of moves){
+    treeLog.push({ind:0,t:'max',txt:`Root candidate: ${m?m.toString():'Draw→CHANCE'}`});
+    const v=m===null?chanceNode(s,pi,2,true,1):expectimax(applyMove(s,pi,m),2,pi,true,1);
+    scores.push({move:m,score:v});
+    if(v>bestV){bestV=v;best=m}
+  }
+  treeLog.push({ind:0,t:'best',txt:`BEST → ${best?best.toString():'Draw'} (EV: ${bestV.toFixed(2)})`});
+  return{move:best,score:bestV,allScores:scores};
+}
+
+// ══════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════
+function cardColorClass(c){
+  if(c.isSkip)return'card-color-skip';
+  return`card-color-${c.color.toLowerCase()}`;
+}
+function renderCard(card,size){
+  const el=document.createElement('div');
+  el.className=`uno-card ${cardColorClass(card)}${size?' '+size:''}`;
+  const n=card.isSkip?'⊘':card.number;
+  el.innerHTML=`<span class="card-corner tl">${n}</span><span class="card-number">${n}</span><span class="card-corner br">${n}</span>`;
+  return el;
+}
+function renderBack(size){
+  const el=document.createElement('div');
+  el.className=`uno-card card-color-back${size?' '+size:''}`;
+  el.innerHTML=`<span>UNO</span>`;return el;
+}
+function updateTopCard(){
+  const el=document.getElementById('top-card');
+  el.className=`uno-card ${cardColorClass(G.topCard)}`;
+  el.style.width='80px';el.style.height='120px';el.style.fontSize='1.8rem';
+  const n=G.topCard.isSkip?'⊘':G.topCard.number;
+  el.innerHTML=`<span class="card-corner tl">${n}</span><span class="card-number">${n}</span><span class="card-corner br">${n}</span>`;
+}
+function updateHandDisplays(){
+  for(const[i,id]of[[0,'p1-hand-top'],[1,'p2-hand-top']]){
+    const el=document.getElementById(id);el.innerHTML='';
+    G.hands[i].forEach(()=>el.appendChild(renderBack('tiny')));
+  }
+  document.getElementById('p1-count').textContent=G.hands[0].length;
+  document.getElementById('p2-count').textContent=G.hands[1].length;
+  document.getElementById('p3-count').textContent=G.hands[2].length;
+  document.getElementById('deck-count').textContent=G.deck.length;
+  ['p1-info','p2-info','p3-info'].forEach((id,i)=>document.getElementById(id).classList.toggle('active',G.currentPlayer===i));
+  document.getElementById('p1-score').textContent=evaluate(G,0,false).toFixed(1);
+  document.getElementById('p2-score').textContent=evaluate(G,1,true).toFixed(1);
+  document.getElementById('p3-score').textContent=evaluate(G,2,false).toFixed(1);
+  renderP3Hand();
+}
+function renderP3Hand(){
+  const c=document.getElementById('p3-hand');c.innerHTML='';
+  const valid=getValidMoves(G.hands[2],G.topCard);
+  if(gameMode==='manual'&&G.currentPlayer===2&&!G.gameOver){
+    G.hands[2].forEach((card,idx)=>{
+      const el=renderCard(card,'small');
+      if(valid.some(m=>m.color===card.color&&m.number===card.number)){
+        el.classList.add('playable');el.title=`Play ${card}`;
+        el.addEventListener('click',()=>humanPlay(idx));
+      }
+      c.appendChild(el);
+    });
+  }else{
+    G.hands[2].forEach(card=>c.appendChild(renderCard(card,'small')));
+  }
+}
+function updateTurnIndicator(){
+  const names=['P1 (Minimax)','P2 (Expectimax)','Player 3'];
+  const colors=['#7ec8e3','#ff8fa3','#7decd4'];
+  const el=document.getElementById('turn-indicator');
+  el.textContent=`Turn: ${names[G.currentPlayer]}`;
+  el.style.borderColor=colors[G.currentPlayer];el.style.color=colors[G.currentPlayer];
+}
+function renderTreeLog(){
+  const p=document.getElementById('tree-panel');p.innerHTML='';
+  const typeMap={header:'header',max:'node-max',min:'node-min',chance:'node-chance',best:'best',leaf:'',opp:'node-min'};
+  for(const e of treeLog.slice(0,50)){
+    const d=document.createElement('div');
+    d.textContent='  '.repeat(Math.min(e.ind,5))+e.txt;
+    d.className=`tree-entry ${typeMap[e.t]||''}`;
+    p.appendChild(d);
+  }
+  p.scrollTop=0;
+}
+function addLog(cls,actor,msg){
+  const log=document.getElementById('log');
+  const d=document.createElement('div');d.className=`log-entry ${cls}`;
+  d.innerHTML=`<span class="turn-num">#${turnNum}</span><span class="actor">${actor}</span> ${msg}`;
+  log.appendChild(d);log.scrollTop=log.scrollHeight;
+}
+function setMsg(m){document.getElementById('action-msg').textContent=m}
+
+// ══════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════
+function startGame(mode){
+  gameMode=mode;
+  document.getElementById('setup-overlay').style.display='none';
+  if(mode==='sim'){
+    document.getElementById('p3-badge').textContent='MM';
+    document.getElementById('p3-strategy').textContent='Minimax · Simulation';
+    document.getElementById('speed-row').style.display='flex';
+    document.getElementById('auto-row').style.display='flex';
+  }else{
+    document.getElementById('p3-badge').textContent='USR';
+    document.getElementById('p3-strategy').textContent='Manual · You play';
+  }
+  G=initState();turnNum=0;treeLog=[];
+  updateTopCard();updateHandDisplays();updateTurnIndicator();
+  document.getElementById('log').innerHTML='';
+  document.getElementById('tree-panel').innerHTML='';
+  addLog('sys','SYSTEM',`Game started [${mode}]. Top: ${G.topCard}`);
+  if(mode==='manual'){
+    document.getElementById('next-btn').disabled=G.currentPlayer===2;
+    document.getElementById('deck-btn').disabled=G.currentPlayer!==2;
+    if(G.currentPlayer===2)setMsg('Your turn! Click a glowing card or DRAW.');
+    else{setMsg('AI is thinking…');document.getElementById('next-btn').disabled=false}
+  }else{
+    document.getElementById('next-btn').disabled=false;
+    document.getElementById('deck-btn').disabled=true;
+    setMsg('Press "Next Turn" or use Auto Play.');
+  }
+}
+function resetGame(){
+  document.getElementById('win-overlay').classList.remove('show');
+  autoStop();
+  document.getElementById('setup-overlay').style.display='flex';
+}
+function executeTurn(){
+  if(!G||G.gameOver)return;
+  turnNum++;const p=G.currentPlayer;
+  let result;
+  if(p===0)result=minimaxBestMove(G,0);
+  else if(p===1)result=expectimaxBestMove(G,1);
+  else result=minimaxBestMove(G,2);
+  const{move,score,allScores}=result;
+  const pc=`p${p+1}`,pn=['P1(MM)','P2(EX)','P3(SIM)'][p];
+  if(move===null){
+    G=applyMove(G,p,null);
+    addLog(pc,pn,`draws a card [score: ${score.toFixed(1)}]`);
+    setMsg(`${pn} draws a card.`);
+  }else{
+    const extra=allScores.length>1?' | Evals: '+allScores.map(s=>`${s.move?s.move.toString():'Draw'}(${s.score.toFixed(1)})`).join(', '):'';
+    G=applyMove(G,p,move);
+    const sk=move.isSkip?' → Next SKIPPED!':'';
+    addLog(pc,pn,`plays <b>${move}</b>${sk} [best: ${score.toFixed(1)}]${extra}`);
+    setMsg(`${pn} played ${move}.${sk}`);
+  }
+  renderTreeLog();updateTopCard();updateHandDisplays();updateTurnIndicator();
+  checkWin();
+  if(!G.gameOver)document.getElementById('next-btn').disabled=false;
+}
+function checkWin(){
+  if(!G.gameOver)return;
+  const wn=['Player 1 (Minimax)','Player 2 (Expectimax)','Player 3'];
+  addLog('win','WINNER',`${wn[G.winner]} wins after ${turnNum} turns! 🎉`);
+  document.getElementById('win-title').textContent=`${wn[G.winner].split(' ')[0]} Wins!`;
+  document.getElementById('win-sub').textContent=`${wn[G.winner]} emptied their hand in ${turnNum} turns.`;
+  document.getElementById('win-overlay').classList.add('show');
+  document.getElementById('next-btn').disabled=true;
+  document.getElementById('deck-btn').disabled=true;
+  autoStop();
+}
+
+// ══════════════════════════════════════════════
+// HUMAN PLAY
+// ══════════════════════════════════════════════
+function humanPlay(cardIdx){
+  if(!G||G.currentPlayer!==2||gameMode!=='manual')return;
+  const card=G.hands[2][cardIdx];
+  const valid=getValidMoves(G.hands[2],G.topCard);
+  if(!valid.some(m=>m.color===card.color&&m.number===card.number)){return}
+  turnNum++;
+  G=applyMove(G,2,card);
+  addLog('p3','YOU',`play <b>${card}</b>${card.isSkip?' → Next SKIPPED!':''}`);
+  setMsg(`You played ${card}.`);
+  treeLog=[];document.getElementById('tree-panel').innerHTML='';
+  updateTopCard();updateHandDisplays();updateTurnIndicator();
+  checkWin();if(G.gameOver)return;
+  runAIUntilP3();
+}
+function humanDraw(){
+  if(!G||G.currentPlayer!==2||gameMode!=='manual')return;
+  turnNum++;
+  G=applyMove(G,2,null);
+  addLog('p3','YOU','draws a card.');setMsg('You drew a card.');
+  treeLog=[];updateTopCard();updateHandDisplays();updateTurnIndicator();
+  checkWin();if(G.gameOver)return;
+  runAIUntilP3();
+}
+function runAIUntilP3(){
+  let safe=0;
+  while(!G.gameOver&&G.currentPlayer!==2&&safe++<10){
+    const p=G.currentPlayer;turnNum++;
+    const res=p===0?minimaxBestMove(G,0):expectimaxBestMove(G,1);
+    const{move,score}=res;
+    const pc=`p${p+1}`,pn=p===0?'P1(MM)':'P2(EX)';
+    if(move===null){G=applyMove(G,p,null);addLog(pc,pn,`draws [${score.toFixed(1)}]`);}
+    else{G=applyMove(G,p,move);addLog(pc,pn,`plays <b>${move}</b>${move.isSkip?' → YOU SKIPPED!':''} [${score.toFixed(1)}]`);}
+    renderTreeLog();updateTopCard();updateHandDisplays();updateTurnIndicator();
+    checkWin();if(G.gameOver)return;
+  }
+  if(!G.gameOver&&G.currentPlayer===2){
+    const v=getValidMoves(G.hands[2],G.topCard);
+    document.getElementById('deck-btn').disabled=v.length>0;
+    document.getElementById('next-btn').disabled=true;
+    setMsg(v.length>0?'Your turn! Click a glowing card to play.':'No valid moves — click DRAW.');
+    renderP3Hand();
+  }
+}
+
+// ══════════════════════════════════════════════
+// AUTO RUN
+// ══════════════════════════════════════════════
+function autoStop(){
+  if(autoInterval){clearInterval(autoInterval);autoInterval=null}
+  autoRunning=false;
+  const b=document.getElementById('auto-btn');if(b)b.textContent='▶ Run';
+}
+document.getElementById('auto-btn').addEventListener('click',()=>{
+  if(autoRunning){autoStop();}else{
+    autoRunning=true;document.getElementById('auto-btn').textContent='⏸ Pause';
+    const spd=parseInt(document.getElementById('speed-slider').value);
+    autoInterval=setInterval(()=>{if(G.gameOver){autoStop();return}executeTurn()},spd);
+  }
+});
+document.getElementById('speed-slider').addEventListener('input',function(){
+  document.getElementById('speed-label').textContent=(this.value/1000).toFixed(1)+'s';
+  if(autoRunning){autoStop();document.getElementById('auto-btn').click();}
+});
+document.getElementById('next-btn').addEventListener('click',()=>{
+  if(!G||G.gameOver)return;
+  if(gameMode==='sim')executeTurn();
+  else if(G.currentPlayer!==2)executeTurn();
+});
+document.getElementById('deck-btn').addEventListener('click',()=>{
+  if(gameMode==='manual'&&G&&G.currentPlayer===2)humanDraw();
+});
+document.getElementById('restart-btn').addEventListener('click',resetGame);
+</script>
+</body>
+</html>
